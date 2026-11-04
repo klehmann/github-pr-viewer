@@ -312,6 +312,7 @@ async function renderConversation() {
   </div></div>`;
   body.querySelectorAll('[data-goto-file]').forEach((a) => a.addEventListener('click', () => { S.file = a.dataset.gotoFile; showTab('files'); }));
   $('#panelMerge')?.addEventListener('click', openMergeDialog);
+  renderBranchBox();
   body.querySelectorAll('.markdown-body a').forEach((a) => { a.target = '_blank'; a.rel = 'noopener'; });
   // GitHub computes mergeable asynchronously: reload if it is still unknown.
   if (pr.state === 'open' && pr.mergeable === null) refreshMergeable(number);
@@ -398,10 +399,11 @@ function mergePanelHtml() {
   const pr = S.pr;
   if (pr.merged_at) {
     return `<div class="panel merge-panel done" id="mergePanel"><div class="panel-row"><span class="merge-icon" style="background:var(--purple)">${ICON.merged.replace(/class="st-\w+"/, 'style="color:#fff"')}</span>
-      <div><div class="panel-title">Merged</div><div class="merge-hint">${esc(pr.merged_by?.login || '')} merged ${fmtDate(pr.merged_at)}${pr.merge_commit_sha ? ` · <span class="ref">${pr.merge_commit_sha.slice(0, 7)}</span>` : ''}</div></div></div></div>`;
+      <div style="flex:1"><div class="panel-title">Merged</div><div class="merge-hint">${esc(pr.merged_by?.login || '')} merged ${fmtDate(pr.merged_at)}${pr.merge_commit_sha ? ` · <span class="ref">${pr.merge_commit_sha.slice(0, 7)}</span>` : ''}</div></div>
+      <div id="branchBox"></div></div></div>`;
   }
   if (pr.state === 'closed') {
-    return `<div class="panel" id="mergePanel"><div class="panel-row"><span class="merge-icon" style="background:var(--red)">${ICON.closed.replace(/class="st-\w+"/, 'style="color:#fff"')}</span><div><div class="panel-title">Closed without merging</div><div class="merge-hint">${fmtDate(pr.closed_at)}</div></div></div></div>`;
+    return `<div class="panel" id="mergePanel"><div class="panel-row"><span class="merge-icon" style="background:var(--red)">${ICON.closed.replace(/class="st-\w+"/, 'style="color:#fff"')}</span><div style="flex:1"><div class="panel-title">Closed without merging</div><div class="merge-hint">${fmtDate(pr.closed_at)}</div></div><div id="branchBox"></div></div></div>`;
   }
   const ms = pr.mergeable === null ? 'unknown' : (pr.mergeable_state || 'unknown');
   const ok = pr.mergeable && ['clean', 'unstable', 'has_hooks'].includes(ms);
@@ -430,8 +432,40 @@ function openMergeDialog() {
     $('#mergeTitle').disabled = $('#mergeMessage').disabled = m === 'rebase';
   };
   $('#mergeMethod').onchange = fill; fill();
+  $('#deleteBranchRow').hidden = !ownBranch(pr);
+  $('#deleteBranchName').textContent = pr.head.ref;
+  $('#deleteBranchBox').checked = store.get('deleteBranch', !!ri.delete_branch_on_merge);
+  $('#deleteBranchBox').onchange = (e) => store.set('deleteBranch', e.target.checked);
   $('#mergeError').hidden = true; $('#mergeConfirm').disabled = false; $('#mergeConfirm').textContent = 'Confirm merge';
   $('#mergeDialog').showModal();
+}
+
+// The head branch can be deleted when it lives in this repository (not a fork) and is not the default branch
+const ownBranch = (pr) => pr.head.repo && pr.head.repo.full_name.toLowerCase() === S.repo.toLowerCase() && pr.head.ref !== pr.head.repo.default_branch;
+
+async function renderBranchBox() {
+  const pr = S.pr; const box = $('#branchBox');
+  if (!box || pr.state !== 'closed' || !ownBranch(pr)) return;
+  const number = pr.number;
+  let exists = false;
+  try { await api(`/repos/${S.repo}/branches/${encodeURIComponent(pr.head.ref)}`); exists = true; } catch (e) { if (e.status !== 404) return; }
+  if (S.pr?.number !== number || !$('#branchBox')) return;
+  $('#branchBox').innerHTML = exists
+    ? `<button class="btn" id="deleteBranchBtn" title="Delete ${esc(pr.head.ref)}">Delete branch</button>`
+    : `<span class="merge-hint">Branch <span class="ref">${esc(pr.head.ref)}</span> deleted</span>`;
+  $('#deleteBranchBtn')?.addEventListener('click', async () => {
+    if (!confirm(`Delete branch "${pr.head.ref}" in ${S.repo}?`)) return;
+    $('#deleteBranchBtn').disabled = true;
+    try { await deleteBranch(pr.number); toast(`Branch ${pr.head.ref} was deleted.`); } catch (e) { toast(e.message, true); }
+    renderBranchBox();
+  });
+}
+
+async function deleteBranch(number) {
+  const res = await fetch(`/api/branch/${S.repo}/${number}`, { method: 'DELETE', headers: { 'X-PR-Viewer': '1' } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Branch not deleted: ${data.message || `Error ${res.status}`}`);
+  return data;
 }
 
 async function doMerge() {
@@ -447,7 +481,11 @@ async function doMerge() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.merged === false) throw new Error(data.message || `Error ${res.status}`);
     $('#mergeDialog').close();
-    toast(`#${pr.number} was merged.`);
+    let msg = `#${pr.number} was merged.`;
+    if ($('#deleteBranchBox').checked && ownBranch(pr)) {
+      try { await deleteBranch(pr.number); msg += ` Branch ${pr.head.ref} was deleted.`; } catch (e) { toast(`#${pr.number} was merged. ${e.message}`, true); msg = null; }
+    }
+    if (msg) toast(msg);
     await openPr(pr.number, { tab: S.tab, file: S.file });
     loadPrs();
   } catch (e) {

@@ -357,6 +357,7 @@ table.diff tr.inline-comments .comment:last-child { margin-bottom: 0; }
 .dialog label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 13px; }
 .dialog label input, .dialog label textarea, .dialog label select { font-weight: 400; }
 .dialog-sub { margin: 0; color: var(--muted); }
+.dialog label.check-label { flex-direction: row; align-items: center; gap: 8px; font-weight: 400; }
 .dialog-error { color: var(--red); margin: 0; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 

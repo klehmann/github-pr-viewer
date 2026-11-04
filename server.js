@@ -112,7 +112,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, r.status, r.text, r.headers['content-type'], extra);
       }
 
-      // Merge: the only write call that is allowed.
+      // Merge (write call 1 of 2)
       const m = url.pathname.match(/^\/api\/merge\/([\w.-]+)\/([\w.-]+)\/(\d+)$/);
       if (req.method === 'PUT' && m) {
         const body = await readBody(req);
@@ -125,6 +125,24 @@ const server = http.createServer(async (req, res) => {
         console.log(`MERGE ${m[1]}/${m[2]}#${m[3]} (${payload.merge_method})`);
         const r = await gh('PUT', `/repos/${m[1]}/${m[2]}/pulls/${m[3]}/merge`, { body: payload });
         return send(res, r.status, r.text);
+      }
+
+      // Delete the head branch of a merged or closed pull request. The server looks up
+      // the branch itself, so the browser can only delete a pull request's own head branch.
+      const d = url.pathname.match(/^\/api\/branch\/([\w.-]+)\/([\w.-]+)\/(\d+)$/);
+      if (req.method === 'DELETE' && d) {
+        const [, owner, repo, number] = d;
+        const pr = await gh('GET', `/repos/${owner}/${repo}/pulls/${number}`);
+        if (pr.status !== 200) return send(res, pr.status, pr.text);
+        const p = JSON.parse(pr.text.toString());
+        if (p.state !== 'closed') return send(res, 409, '{"message":"The pull request is still open."}');
+        if (!p.head.repo || p.head.repo.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) {
+          return send(res, 409, '{"message":"The branch belongs to a fork and cannot be deleted here."}');
+        }
+        if (p.head.ref === p.head.repo.default_branch) return send(res, 409, '{"message":"The default branch cannot be deleted."}');
+        console.log(`DELETE BRANCH ${owner}/${repo}:${p.head.ref} (#${number})`);
+        const r = await gh('DELETE', `/repos/${owner}/${repo}/git/refs/heads/${p.head.ref.split('/').map(encodeURIComponent).join('/')}`);
+        return send(res, r.status === 204 ? 200 : r.status, r.status === 204 ? JSON.stringify({ deleted: p.head.ref }) : r.text);
       }
 
       return send(res, 404, '{"message":"not found"}');

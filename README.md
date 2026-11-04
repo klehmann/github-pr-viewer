@@ -19,6 +19,7 @@ only that one file, inline or side by side, optionally with the whole file conte
   - Before/after preview for images, review comments shown at their line
   - "Viewed" checkbox per file (stored locally, reset when the file changes)
 - Merge button (merge commit, squash or rebase) with a confirmation dialog
+- Delete the head branch after merging (option in the merge dialog, or a button on merged and closed pull requests)
 - Light and dark mode following the system setting
 
 ## Screenshots
@@ -76,9 +77,12 @@ served from `node_modules`.
 - The server listens on `127.0.0.1` only and accepts only the hosts `localhost` and
   `127.0.0.1`, which protects against DNS rebinding.
 - Every API call needs a custom request header, so other websites cannot trigger calls.
-- The only write operation is the merge (`PUT /api/merge/:owner/:repo/:number`), and the
-  UI sends it only after you confirm the dialog. It passes the head commit SHA, so GitHub
-  refuses the merge if the branch changed in the meantime.
+- There are only two write operations, and the UI sends each one only after you confirm it:
+  - the merge (`PUT /api/merge/:owner/:repo/:number`), which passes the head commit SHA,
+    so GitHub refuses the merge if the branch changed in the meantime;
+  - deleting a pull request's head branch (`DELETE /api/branch/:owner/:repo/:number`).
+    The server looks up the branch name from the pull request itself and refuses open
+    pull requests, branches in forks and the default branch.
 
 ## License
 
