@@ -1,4 +1,4 @@
-# PR Viewer
+# GitHub PR Viewer
 
 A small local web app for reviewing GitHub pull requests, as an alternative to the
 "Files changed" view on github.com. Click a file on the left and the right side shows
