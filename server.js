@@ -142,5 +142,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`PR Viewer running at http://localhost:${PORT}`);
+  console.log(`GitHub PR Viewer running at http://localhost:${PORT}`);
 });
