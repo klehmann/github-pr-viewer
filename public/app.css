@@ -310,8 +310,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .viewed-toggle.on { background: var(--accent-soft); border-color: var(--accent); }
 .diff-body { flex: 1; min-height: 0; display: flex; position: relative; }
 .diff-scroll { overflow: auto; flex: 1; background: var(--surface); }
-.diff-ruler { width: 14px; flex-shrink: 0; position: relative; background: var(--surface-2); border-left: 1px solid var(--border); cursor: pointer; }
-.ruler-mark { position: absolute; left: 2px; right: 2px; border-radius: 1px; pointer-events: none; }
+.diff-ruler { width: 18px; flex-shrink: 0; position: relative; background: var(--surface-2); border-left: 1px solid var(--border); cursor: pointer; }
+.ruler-mark { position: absolute; left: 3px; right: 3px; border-radius: 2px; pointer-events: none; }
 .ruler-mark.add { background: var(--green); }
 .ruler-mark.del { background: var(--red); }
 .ruler-mark.mod { background: linear-gradient(90deg, var(--red) 50%, var(--green) 50%); }

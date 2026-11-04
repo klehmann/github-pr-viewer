@@ -936,7 +936,7 @@ function buildRuler() {
     const kind = c.kinds.has('mod') || (c.kinds.has('add') && c.kinds.has('del')) ? 'mod' : [...c.kinds][0];
     m.className = `ruler-mark ${kind}`;
     m.style.top = `${(c.top / total) * h}px`;
-    m.style.height = `${Math.max(3, ((c.bottom - c.top) / total) * h)}px`;
+    m.style.height = `${Math.max(5, ((c.bottom - c.top) / total) * h)}px`;
     frag.appendChild(m);
   }
   ruler.appendChild(frag);
