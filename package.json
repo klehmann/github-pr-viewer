@@ -1,0 +1,15 @@
+{
+  "name": "github-pr-viewer",
+  "version": "1.0.0",
+  "description": "Local web app for reviewing GitHub pull requests one file at a time, using the gh CLI",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@highlightjs/cdn-assets": "^11.10.0",
+    "diff": "^5.2.0"
+  },
+  "private": true,
+  "author": "Mindoo GmbH"
+}
