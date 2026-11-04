@@ -484,10 +484,18 @@ async function renderFilesTab() {
         <div class="seg" id="viewSeg"><button data-view="unified">Inline</button><button data-view="split">Side by side</button></div>
         <label class="toggle"><input type="checkbox" id="fullToggle"> Whole file</label>
         <label class="viewed-toggle" id="viewedToggle"><input type="checkbox" id="viewedBox"> Viewed</label>
+        <span class="change-nav" id="changeNav" hidden>
+          <button class="btn btn-sm" id="prevChange" title="Previous change (p)">‹</button>
+          <span id="changeCount"></span>
+          <button class="btn btn-sm" id="nextChange" title="Next change (n)">›</button>
+        </span>
         <button class="btn btn-sm" id="prevFile" title="Previous file (k)">↑</button>
         <button class="btn btn-sm" id="nextFile" title="Next file (j)">↓</button>
       </div>
-      <div class="diff-scroll" id="diffScroll"></div>
+      <div class="diff-body">
+        <div class="diff-scroll" id="diffScroll"></div>
+        <div class="diff-ruler" id="diffRuler" hidden title="Changes in this file. Click to jump."><div class="ruler-view" id="rulerView"></div></div>
+      </div>
     </div>
   </div>`;
   $('#fileFilter').addEventListener('input', renderTree);
@@ -495,6 +503,11 @@ async function renderFilesTab() {
   $('#fullToggle').checked = S.full;
   $('#fullToggle').addEventListener('change', (e) => { S.full = e.target.checked; store.set('full', S.full); renderDiff(); });
   $('#viewedBox').addEventListener('change', (e) => setViewed(currentFile(), e.target.checked));
+  $('#prevChange').addEventListener('click', () => stepChange(-1));
+  $('#nextChange').addEventListener('click', () => stepChange(1));
+  $('#diffScroll').addEventListener('scroll', () => { updateRulerView(); updateChangeCount(); }, { passive: true });
+  $('#diffRuler').addEventListener('mousedown', onRulerDown);
+  new ResizeObserver(() => buildRuler()).observe($('#diffScroll'));
   $('#prevFile').addEventListener('click', () => stepFile(-1));
   $('#nextFile').addEventListener('click', () => stepFile(1));
   $('#fileTree').addEventListener('click', onTreeClick);
@@ -849,7 +862,94 @@ async function renderDiff() {
   scroll.scrollTop = 0;
   scroll.querySelectorAll('.markdown-body a').forEach((a) => { a.target = '_blank'; a.rel = 'noopener'; });
   // In the whole-file view, jump to the first change
-  if (S.full) scroll.querySelector('tr.add, tr.del, td.code.add, td.code.del')?.scrollIntoView({ block: 'center' });
+  buildRuler();
+  if (S.full && S.changes.length) scrollToChange(0);
+}
+
+// ---------- Overview ruler: marks the changed spots next to the scrollbar ----------
+S.changes = [];
+const rowKind = (tr) => {
+  if (tr.classList.contains('add')) return 'add';
+  if (tr.classList.contains('del')) return 'del';
+  const a = tr.querySelector('td.code.add'); const d = tr.querySelector('td.code.del');
+  return a && d ? 'mod' : a ? 'add' : d ? 'del' : null;
+};
+function buildRuler() {
+  const scroll = $('#diffScroll'); const ruler = $('#diffRuler'); if (!scroll || !ruler) return;
+  ruler.querySelectorAll('.ruler-mark').forEach((m) => m.remove());
+  const table = scroll.querySelector('table.diff');
+  S.changes = [];
+  if (!table) { ruler.hidden = true; $('#changeNav').hidden = true; return; }
+  // Group consecutive changed rows into blocks
+  let cur = null;
+  for (const tr of table.tBodies[0].rows) {
+    if (tr.classList.contains('inline-comments')) continue;
+    const k = rowKind(tr);
+    if (!k) { cur = null; continue; }
+    if (!cur) { cur = { top: tr.offsetTop, bottom: tr.offsetTop + tr.offsetHeight, kinds: new Set([k]), row: tr }; S.changes.push(cur); } else { cur.bottom = tr.offsetTop + tr.offsetHeight; cur.kinds.add(k); }
+  }
+  const total = scroll.scrollHeight || 1;
+  ruler.hidden = !S.changes.length;
+  $('#changeNav').hidden = !S.changes.length;
+  const h = ruler.clientHeight;
+  const frag = document.createDocumentFragment();
+  for (const c of S.changes) {
+    const m = document.createElement('div');
+    const kind = c.kinds.has('mod') || (c.kinds.has('add') && c.kinds.has('del')) ? 'mod' : [...c.kinds][0];
+    m.className = `ruler-mark ${kind}`;
+    m.style.top = `${(c.top / total) * h}px`;
+    m.style.height = `${Math.max(3, ((c.bottom - c.top) / total) * h)}px`;
+    frag.appendChild(m);
+  }
+  ruler.appendChild(frag);
+  updateRulerView(); updateChangeCount();
+}
+function updateRulerView() {
+  const scroll = $('#diffScroll'); const v = $('#rulerView'); if (!scroll || !v) return;
+  const h = $('#diffRuler').clientHeight; const total = scroll.scrollHeight || 1;
+  v.style.top = `${(scroll.scrollTop / total) * h}px`;
+  v.style.height = `${Math.max(8, (scroll.clientHeight / total) * h)}px`;
+}
+// Index of the first change at or below the top of the visible area
+function currentChangeIndex() {
+  const top = $('#diffScroll').scrollTop + 1;
+  const i = S.changes.findIndex((c) => c.bottom > top);
+  return i < 0 ? S.changes.length : i;
+}
+function updateChangeCount() {
+  const el = $('#changeCount'); if (!el || !S.changes.length) return;
+  const scroll = $('#diffScroll');
+  const view = [scroll.scrollTop, scroll.scrollTop + scroll.clientHeight];
+  const visible = S.changes.map((c, i) => (c.bottom > view[0] && c.top < view[1] ? i : -1)).filter((i) => i >= 0);
+  const below = S.changes.filter((c) => c.top >= view[1]).length;
+  el.textContent = visible.length
+    ? `${visible[0] + 1}${visible.length > 1 ? '–' + (visible[visible.length - 1] + 1) : ''} of ${S.changes.length}`
+    : `${S.changes.length} change${S.changes.length === 1 ? '' : 's'}`;
+  el.title = below ? `${below} more change${below === 1 ? '' : 's'} below` : 'No more changes below';
+}
+function scrollToChange(i) {
+  const c = S.changes[i]; if (!c) return;
+  const scroll = $('#diffScroll');
+  scroll.scrollTop = Math.max(0, c.top - Math.min(120, scroll.clientHeight / 4));
+}
+function stepChange(dir) {
+  if (!S.changes.length) return;
+  const scroll = $('#diffScroll'); const top = scroll.scrollTop + Math.min(120, scroll.clientHeight / 4);
+  let i;
+  if (dir > 0) i = S.changes.findIndex((c) => c.top > top + 2);
+  else { i = -1; S.changes.forEach((c, k) => { if (c.top < top - 2) i = k; }); }
+  if (i >= 0) scrollToChange(i);
+}
+function onRulerDown(e) {
+  const ruler = $('#diffRuler'); const scroll = $('#diffScroll');
+  const jump = (ev) => {
+    const r = ruler.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height));
+    scroll.scrollTop = frac * scroll.scrollHeight - scroll.clientHeight / 2;
+  };
+  jump(e); e.preventDefault();
+  const up = () => { window.removeEventListener('mousemove', jump); window.removeEventListener('mouseup', up); };
+  window.addEventListener('mousemove', jump); window.addEventListener('mouseup', up);
 }
 
 // ---------- Events ----------
@@ -891,6 +991,8 @@ document.addEventListener('keydown', (e) => {
   if (S.tab === 'files' && S.files) {
     if (e.key === 'j') { stepFile(1); e.preventDefault(); }
     if (e.key === 'k') { stepFile(-1); e.preventDefault(); }
+    if (e.key === 'n') { stepChange(1); e.preventDefault(); }
+    if (e.key === 'p') { stepChange(-1); e.preventDefault(); }
     if (e.key === 'v') { const f = currentFile(); if (f) setViewed(f, !isViewed(f)); }
   }
   if (e.key === 'r') refresh();

@@ -14,6 +14,8 @@ only that one file, inline or side by side, optionally with the whole file conte
 - Files changed: file tree on the left, exactly one file on the right
   - Inline or side-by-side diff with syntax highlighting and word-level highlights
   - "Whole file" shows the complete file with its changes (compared with the merge base)
+  - A ruler next to the scrollbar marks every changed spot; click it to jump there, or step
+    through the changes with `n` / `p`
   - Before/after preview for images, review comments shown at their line
   - "Viewed" checkbox per file (stored locally, reset when the file changes)
 - Merge button (merge commit, squash or rebase) with a confirmation dialog
@@ -56,6 +58,7 @@ Then open http://localhost:4777. To use another port: `PORT=5000 npm start`.
 | Key | Action |
 | --- | --- |
 | `j` / `k` | Next / previous file |
+| `n` / `p` | Next / previous change in the current file |
 | `v` | Mark the current file as viewed |
 | `l` | Show / hide the pull request list |
 | `r` | Reload |

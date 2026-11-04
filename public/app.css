@@ -308,7 +308,17 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; user-select: none; }
 .viewed-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; cursor: pointer; user-select: none; }
 .viewed-toggle.on { background: var(--accent-soft); border-color: var(--accent); }
+.diff-body { flex: 1; min-height: 0; display: flex; position: relative; }
 .diff-scroll { overflow: auto; flex: 1; background: var(--surface); }
+.diff-ruler { width: 14px; flex-shrink: 0; position: relative; background: var(--surface-2); border-left: 1px solid var(--border); cursor: pointer; }
+.ruler-mark { position: absolute; left: 2px; right: 2px; border-radius: 1px; pointer-events: none; }
+.ruler-mark.add { background: var(--green); }
+.ruler-mark.del { background: var(--red); }
+.ruler-mark.mod { background: linear-gradient(90deg, var(--red) 50%, var(--green) 50%); }
+.ruler-view { position: absolute; left: 0; right: 0; background: color-mix(in srgb, var(--accent) 16%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 2px; pointer-events: none; }
+.change-nav { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.change-nav[hidden] { display: none; }
+.change-nav #changeCount { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
 .diff-msg { padding: 40px; text-align: center; color: var(--muted); }
 
 table.diff { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; line-height: 20px; table-layout: fixed; }
